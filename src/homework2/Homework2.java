@@ -2,11 +2,20 @@
 package homework2;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
+//import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.SortedSet;
@@ -26,8 +35,9 @@ class FruitBoard implements Cloneable{
     TreeSet<Integer> updated_columns; 
     int score;
     int fruits_picked;
-    int chance; // 0 for me 1 for opponent
-
+    int chance;
+    int total_picked;// 0 for me 1 for opponent
+//    int[][] picked_board = new int[Homework2.dimension][Homework2.dimension];
 
     public Object clone(int [][] matrix, int ch) throws CloneNotSupportedException
     {
@@ -56,21 +66,22 @@ class FruitBoard implements Cloneable{
     
     public void score(){
         fruits_picked += 1;
-        score = (fruits_picked ) * (fruits_picked);
+        score = (fruits_picked) * (fruits_picked) ;
     }
     public int nextChance(){
         return this.chance == 0 ? 1 : 0;
     }
     
     public boolean isGameOver(){
-        for(int i =0 ;i < Homework2.dimension; i++){
-            for (int j = 0; j < Homework2.dimension; j++) {
-                if(this.picked_board[i][j] != -1){
-                    return false;
-                } 
-            }
-        }
-        return true;
+//        for(int i =0 ;i < Homework2.dimension; i++){
+//            for (int j = 0; j < Homework2.dimension; j++) {
+//                if(this.fruit_board[i][j] != -1){
+//                    return false;
+//                } 
+//            }
+//        }
+//        return true;
+        return this.total_picked == Homework2.all_fruit; 
     }
 }
 
@@ -83,19 +94,32 @@ public class Homework2 {
     static int fruit_type;
     static double remaining_time;
 //    static HashMap<Double, ArrayList<Integer[2]>> min_max_table=  new HashMap<Double, ArrayList<Integer[2]>>();
+    static int pruneCount = 0;
+    static int childCount = 0;
+    static int all_fruit = 0;
+    static boolean depth_updated = false;
+    static int available_child = 0;
+    static int final_depth = -1;
     
-    public static void main(String[] args) throws FileNotFoundException, IOException, CloneNotSupportedException {
+    public static void main(String[] args) throws FileNotFoundException, IOException, CloneNotSupportedException, URISyntaxException {
         // TODO code application logic here
         String row;
         int[] r;
         String[] o;
+        
                 
         BufferedReader br =  new BufferedReader(new FileReader("input.txt"));
+
+//        InputStream input = new URL( "file://192.168.1.1/shared_disk/input.txt" ).openStream();        
+//        BufferedReader br =  new BufferedReader(new InputStreamReader(input));
+        
+        
         dimension = Integer.parseInt(br.readLine());
+        all_fruit = dimension * dimension;
         fruit_type = Integer.parseInt(br.readLine());
         remaining_time = Double.parseDouble(br.readLine());
         FruitBoard initial_board = new FruitBoard(dimension);
-        int available_child = 0;
+        
         for (int i = 0; i < dimension; i++) {
             r = new int[dimension];
             row = br.readLine();
@@ -103,18 +127,34 @@ public class Homework2 {
             for (int j = 0; j < dimension; j++) {
                 if(o[j].equals("*")){
                     r[j]=-1;
+                    initial_board.total_picked++;
                 }
                 else{
                     r[j] = Integer.parseInt(o[j]);
                     available_child++;
+//                    boolean not_considered = true;
+//                    
+//                    if(j != 0 && (initial_board.fruit_board[i][j-1] != r[j])){
+//                       not_considered =  false;
+//                       available_child++;
+//                    }
+//                    else if(not_considered && i != 0 && initial_board.fruit_board[i-1][j] != r[j]){ 
+//                        available_child++;
+//                    }
+//                    else if(i==0 && j==0){
+//                        available_child++;
+//                    }
+
                 }
             }
             initial_board.fruit_board[i] = r;
         }
+        System.out.println("CHILDS : " + available_child);
         print_sol(initial_board);
         int[] p = new int[]{1};
         FruitBoard frb_new = (FruitBoard)initial_board.clone(initial_board.fruit_board,0);
-        int depth = findDynamicDepth(available_child,remaining_time * 1000);
+        FruitBoard frb_new2 = (FruitBoard)initial_board.clone(initial_board.fruit_board,0);
+        int depth = findDynamicDepth(available_child,remaining_time);
         System.out.println("ORIGINAL BOARD : ");
         print_sol(initial_board);
 //        frb_new = playMiniMax(frb_new, 1);
@@ -123,13 +163,23 @@ public class Homework2 {
         frb_new = apply_gravity(frb_new,frb_new.updated_columns);
         System.out.println("ANSSSS : " + frb_new.score + " MOVE : " + frb_new.move_row+"," + frb_new.move_col + "Fruits Picked : "+ frb_new.fruits_picked);
         System.out.println("NEW BOARD : ");
+        System.out.println("PRUNE : " + pruneCount);
+        System.out.println("CHILD : " + childCount);
         print_sol(frb_new);
+        
     }
     
-    static void print_sol(FruitBoard frb) throws FileNotFoundException, UnsupportedEncodingException{
+    static void print_sol(FruitBoard frb) throws FileNotFoundException, UnsupportedEncodingException, IOException{
+//        File file = new File("file://192.168.1.1/shared_disk/output.txt");
+//        OutputStream file_writer_net = new FileOutputStream( new URL("file://192.168.1.1/shared_disk/output.txt" ).openStream());
         PrintWriter file_write = new PrintWriter("output.txt", "UTF-8");
+//        PrintWriter file_writer_net = new PrintWriter( new FileOutputStream( file ));
         file_write.print((char)((65) + frb.move_col));
         file_write.println((frb.move_row + 1));
+        System.out.print((char)((65) + frb.move_col));
+        System.out.println((frb.move_row + 1));
+//        file_writer_net.write((char)((65) + frb.move_col));
+//        file_writer_net.write((frb.move_row + 1));
         for(int[] row : frb.fruit_board){
             System.out.println(Arrays.toString(row));
 //            file_write.print(Arrays.toString(row));
@@ -150,7 +200,9 @@ public class Homework2 {
             file_write.println("");
         }
         System.out.println("Score :"+frb.score);
+        System.out.println("Fruit :"+frb.fruits_picked);
         file_write.close();
+//        copyFile("output.txt",  "file://192.168.1.1/shared_disk/output.txt");
     }
     
     static FruitBoard apply_gravity(FruitBoard frb, TreeSet<Integer> affected_cols){
@@ -190,16 +242,18 @@ public class Homework2 {
     }
     
     static FruitBoard pick_and_update_number(FruitBoard frb,int num, int row, int col, boolean update, int [][] visited, int score){
-        if(frb.fruit_board[row][col] == num && visited[row][col] == 0  && frb.fruit_board[row][col] != -1){ 
-            visited[row][col] = 1;
+//        if(frb.fruit_board[row][col] == num && visited[row][col] == 0  && frb.fruit_board[row][col] != -1){ 
+        if(frb.fruit_board[row][col] == num && frb.fruit_board[row][col] != -1){ 
+//            visited[row][col] = 1;
             frb.picked_board[row][col] = 1;
+            frb.total_picked++;
 //            System.out.println("PICKEDD" + row + col);
-            if(update)
-            { 
-                frb.fruit_board[row][col] = -1;
-            }
+            frb.fruit_board[row][col] = -1;
+//            if(update)
+//            { 
+//            }
             frb.updated_columns.add(col);
-            score += 1;
+//            score += 1;
 //            System.out.println("NEW SCORE :###############################" + score);
 //            frb.fruits_picked = score;
             frb.score(); 
@@ -221,306 +275,106 @@ public class Homework2 {
         return frb;
     }
     
-    static FruitBoard playAlphaBeta(FruitBoard frb, int depth, int alpha, int beta) throws CloneNotSupportedException, FileNotFoundException, UnsupportedEncodingException{
+    static FruitBoard playAlphaBeta(FruitBoard frb, int depth, int alpha, int beta) throws CloneNotSupportedException, FileNotFoundException, UnsupportedEncodingException, IOException{
         boolean printing = false;
         boolean alpha_on = true;
-        if(printing){
-        System.out.println("----INPUT------");
-        System.out.println("Depth : "+ depth + " CHANCE : " + frb.chance + " NEXT CHANCE : " + frb.nextChance());
-        print_sol(frb);
-        System.out.println("//----INPUT------//");
-        }
+        boolean call_dynamic_depth = false;
         int MAX_SCORE = Integer.MIN_VALUE, MIN_SCORE = Integer.MAX_VALUE;
-        if(printing) System.out.println("AT CALL HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-        if(depth == 0|| frb.isGameOver()){
+        
+        if(depth < 0 || frb.isGameOver()){
             return frb;
         }
-        FruitBoard bestBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
+        if(!depth_updated){
+            depth_updated = true;
+            available_child = 0;
+            call_dynamic_depth = true;
+        }
+        FruitBoard historyBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
+        ArrayList<FruitBoard> child_list = new ArrayList<>();
         for (int i = 0; i < dimension; i++) {
             for (int j = 0; j < dimension; j++) {
                 if(frb.fruit_board[i][j] != -1 && frb.picked_board[i][j] != 1){
-                    if(printing){
-                        System.out.println("AT CHILD LOOP HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-                        System.out.println("BAAP KA HASH : " + frb.hashCode());
+                    if(call_dynamic_depth){
+                        available_child++;
                     }
+                    childCount++;
                     FruitBoard new_frb = (FruitBoard)frb.clone(frb.fruit_board,frb.nextChance());
                     new_frb = pick_and_update_number(new_frb, new_frb.fruit_board[i][j], i, j, true,new int[dimension][dimension],0);
+                    historyBoard = pick_and_update_number(historyBoard, historyBoard.fruit_board[i][j], i, j, true,new int[dimension][dimension],0);
                     new_frb = apply_gravity(new_frb,new_frb.updated_columns);
-                    
-                    if(printing) System.out.println("----CHILD------ MOVE : " + i + ", " + j + " HASH :" + new_frb.hashCode());
-                    if(printing) print_sol(new_frb);
-                    
-                    frb.fruits_picked = 0;
+                    for (int p = 0; p < dimension; p++) {
+                        for (int q = 0; q < dimension; q++) {
+                            if(new_frb.picked_board[p][q] == 1){
+                                frb.picked_board[p][q] = new_frb.picked_board[p][q];
+                            } 
+                        }
+                    }
                     new_frb.fruits_picked=0;
                     new_frb.move_col = j;
                     new_frb.move_row = i;
-                    FruitBoard return_board = playAlphaBeta(new_frb, depth - 1, alpha, beta );
+                    child_list.add(new_frb);
                     
-                    
-                    if(printing) System.out.println("RETURN ==  NEW FRB +================== : " + (return_board.hashCode() == new_frb.hashCode()));
-                    
-//                    if(frb.chance  == 0){
-//                        new_frb.score =  return_board.score + new_frb.score;
-//                    }
-//                    else{
-//                        new_frb.score =  return_board.score - new_frb.score;
-//                    }
-                    new_frb.score = frb.chance  == 0  ? return_board.score + new_frb.score : return_board.score - new_frb.score;
-                    
-                    if(printing){
-                        System.out.println("RETURN SCORES : "  + return_board.score + " For Hash : " + frb.hashCode() );
-                        print_sol(return_board);
-                    }
-                    boolean alpha_cut = false, beta_cut = false;
-
-                    if(frb.chance  == 0 && new_frb.score > MAX_SCORE){
-                        MAX_SCORE = new_frb.score;
-                        if (MAX_SCORE >= beta){
-                            beta_cut = true;
-                        }
-                        if(printing)System.out.println("AT MAX_UPDATE HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-                        alpha = Math.max(alpha, MAX_SCORE);
-                        bestBoard = new_frb;
-                    }
-                    if(frb.chance  == 1 && new_frb.score < MIN_SCORE){
-                        MIN_SCORE = new_frb.score;
-                        if (MIN_SCORE <= alpha){
-                            alpha_cut = true;
-                        }
-                        if(printing)System.out.println("AT MIN_UPDATE HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-                        beta = Math.min(beta, MIN_SCORE);
-                        bestBoard = new_frb;
-                    }
-                    if(printing)System.out.println("//----CHILD------// "+" HASH :" + new_frb.hashCode());
-                    if (alpha_on && (beta_cut || alpha_cut)) {
-                        if(printing)System.out.println("PRUNEDDDD");
-                        bestBoard.fruits_picked = 0;
-                        bestBoard = pick_and_update_number(bestBoard, bestBoard.fruit_board[bestBoard.move_row][bestBoard.move_col], bestBoard.move_row, bestBoard.move_col, true,new int[dimension][dimension],0);
-                        bestBoard = apply_gravity(bestBoard,bestBoard.updated_columns);
-                        return bestBoard;
-                    }
                 }
             }
         }
-        if(printing){
-            System.out.println("----RETURN NORMAL : ------");
-            print_sol(bestBoard);
-            System.out.println("/////RETURN NORMAL : /////");
+        if(call_dynamic_depth){
+            final_depth = findDynamicDepth(available_child,remaining_time);
+            depth = final_depth; 
+        }
+        Collections.sort(child_list, (FruitBoard p1, FruitBoard p2) -> p2.score - p1.score);
+        FruitBoard bestBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
+        for (FruitBoard new_frb : child_list){
+            frb.fruits_picked = 0;
+            new_frb.score = frb.chance  == 0  ? frb.score + new_frb.score : + frb.score  - new_frb.score;
+            FruitBoard return_board = playAlphaBeta(new_frb, depth - 1, alpha, beta );
+            new_frb.score = frb.chance  == 0  ? return_board.score + new_frb.score : return_board.score - new_frb.score;
+
+            boolean alpha_cut = false, beta_cut = false;
+
+            if(frb.chance  == 0 && new_frb.score > MAX_SCORE){
+                MAX_SCORE = new_frb.score;
+                if (MAX_SCORE >= beta){
+                    beta_cut = true;
+                }
+                alpha = Math.max(alpha, MAX_SCORE);
+                bestBoard = new_frb;
+            }
+            if(frb.chance  == 1 && new_frb.score < MIN_SCORE){
+                MIN_SCORE = new_frb.score;
+                if (MIN_SCORE <= alpha){
+                    alpha_cut = true;
+                }
+                beta = Math.min(beta, MIN_SCORE);
+                bestBoard = new_frb;
+            }
+            if (alpha_on && (beta_cut || alpha_cut)) {
+                pruneCount++;
+                return bestBoard;
+            }
         }
         return bestBoard;
     }
     
+    
     static int findDynamicDepth(int available_moves,double remaining_time) throws FileNotFoundException, IOException{
-        if(available_moves == 1){
-            return 1;
-        }
-//        double perNodeTime = remaining_time / (available_moves/2);
-        double perNodeTime = remaining_time / (available_moves);
+        if(available_moves == 1) return 1;
+
+        double perNodeTime = remaining_time / (available_moves/2);
+            
+        System.out.println("remaining:" + remaining_time);
+        System.out.println("available :" + available_moves);
+        System.out.println("perNode:" + perNodeTime);
         BufferedReader br =  new BufferedReader(new FileReader("caliberate.txt"));
         double timePerNodeCalculated =  Double.parseDouble(br.readLine());
-//        double depth = ((Math.log(((perNodeTime / timePerNodeCalculated) * (available_moves - 1)) + 1)/ Math.log(available_moves)) - 1); 
-        double depth = ((Math.log(((perNodeTime / timePerNodeCalculated) * (available_moves)) + 1)/ Math.log(available_moves)) - 1); 
+        System.out.println("perNodeCalc:" + timePerNodeCalculated);
+        double depth = ((Math.log(((perNodeTime / timePerNodeCalculated) * (available_moves - 1)) + 1)/ Math.log(available_moves)) - 1); 
+//        double depth = ((Math.log(((perNodeTime / timePerNodeCalculated) * (available_moves- 1)))/ Math.log(available_moves - 1))); 
+        System.out.println("DEPTH FLOAT : " + depth);
         if(depth < 0)
             return 1;
         if(depth >= available_moves)
             return available_moves;
-        depth = 3;
+//        depth = 3;
         return (int)depth;
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    static FruitBoard playMiniMax(FruitBoard frb, int depth) throws CloneNotSupportedException, FileNotFoundException, UnsupportedEncodingException{
-//        System.out.println("INPUT FOR MIN MAX: " + "CHANCE : " + frb.chance + " NEXT CHANCE : " + frb.nextChance());
-//        print_sol(frb);
-        int MAX_SCORE = -999999999, MIN_SCORE = 999999999;
-        if(depth == 0 || frb.isGameOver()){
-            return frb;
-        }
-        FruitBoard bestBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
-        if(frb.chance != 4){
-            for (int i = 0; i < dimension; i++) {
-                for (int j = 0; j < dimension; j++) {
-                    if(frb.fruit_board[i][j] != -1 && frb.picked_board[i][j] != 1 ){
-                        int prev_score =  frb.score;
-                        FruitBoard new_frb = (FruitBoard)frb.clone(frb.fruit_board,frb.nextChance());
-//                        System.out.println( "CALLLL TO PICK with" +i+j);
-                        frb = pick_and_update_number(frb, frb.fruit_board[i][j], i, j, false,new int[dimension][dimension],0);
-//                        new_frb.score = 0;
-//                        new_frb.fruits_picked = 0;
-                        if(frb.chance  == 0){
-                            new_frb.score += frb.score;
-                        }
-                        else{
-                            new_frb.score -= frb.score;
-                        }
-                        new_frb.move_col = j;
-                        new_frb.move_row = i;
-//                        System.out.println("FRUITS PICKING UP: " + frb.fruits_picked);
-//                        System.out.println(" NEW_FRB == OLD_FRB "  + (new_frb.hashCode() == frb.hashCode()) + "NEXT CHANCE :" + new_frb.chance + "CURR SCORE : " + new_frb.score);
-                        FruitBoard return_board = playMiniMax(new_frb, depth - 1 );
-                        if(frb.chance  == 0 && return_board.score > MAX_SCORE){
-//                            System.out.println("FRUITS MAXIMUM: " + return_board.fruits_picked);
-                            MAX_SCORE = return_board.score;
-                            bestBoard = return_board;
-                        }
-                        if(frb.chance  == 1 && return_board.score < MIN_SCORE){
-                            System.out.println("FRUITS MIN: " + return_board.fruits_picked);
-                            MIN_SCORE = return_board.score;
-                            bestBoard = return_board;
-                        }   
-                    }
-                }
-            }
-            bestBoard.fruits_picked = 0;
-            bestBoard = pick_and_update_number(bestBoard, bestBoard.fruit_board[bestBoard.move_row][bestBoard.move_col], bestBoard.move_row, bestBoard.move_col, true,new int[dimension][dimension],0);
-            bestBoard = apply_gravity(bestBoard,bestBoard.updated_columns);
-            return bestBoard;
-        }
-        else if(frb.chance == 2){
-//            FruitBoard bestBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
-            for (int i = 0; i < dimension; i++) {
-                for (int j = 0; j < dimension; j++) {
-                    if(frb.fruit_board[i][j] != -1){
-//                        frb = pick_and_update_number(frb, frb.fruit_board[i][j], i, j, false, new int[dimension][dimension],0);
-                        System.out.println( "CALLLL TO PICK 2222");
-                        FruitBoard new_frb = (FruitBoard)frb.clone(frb.fruit_board,frb.nextChance());
-//                        new_frb.score = 0;
-//                        new_frb.fruits_picked = 0;
-                        FruitBoard return_board = playMiniMax(new_frb, depth - 1 );
-                        if(return_board.score < MIN_SCORE){
-                            return_board.move_col = j;
-                            return_board.move_row = i;
-                            MIN_SCORE = return_board.score;
-                            bestBoard = return_board;
-                        }    
-                    }
-                }
-            }
-            System.out.println( "CALLLL TO PICK 222233333333333333333");
-            bestBoard = pick_and_update_number(bestBoard, bestBoard.fruit_board[bestBoard.move_row][bestBoard.move_col], bestBoard.move_row, bestBoard.move_col, true, new int[dimension][dimension],0);
-            bestBoard = apply_gravity(bestBoard,bestBoard.updated_columns);
-            return bestBoard;
-        }
-        return frb;
-    }
-    
-//    static FruitBoard playAlphaBeta(FruitBoard frb, int depth, int alpha, int beta) throws CloneNotSupportedException, FileNotFoundException, UnsupportedEncodingException{
-//        System.out.println("----INPUT------");
-//            System.out.println("Depth : "+ depth + " CHANCE : " + frb.chance + " NEXT CHANCE : " + frb.nextChance());
-//            print_sol(frb);
-//        System.out.println("//----INPUT------//");
-//        int MAX_SCORE = -999999999, MIN_SCORE = 999999999;
-//        System.out.println("AT CALL HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-//        if(depth == 0|| frb.isGameOver()){
-////            frb = pick_and_update_number(frb, frb.fruit_board[frb.move_row][frb.move_col], frb.move_row, frb.move_col, false,new int[dimension][dimension],0);
-//            return frb;
-//        }
-//        FruitBoard bestBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
-//        for (int i = 0; i < dimension; i++) {
-//            for (int j = 0; j < dimension; j++) {
-//                if(frb.fruit_board[i][j] != -1 ){//&& frb.picked_board[i][j] != 1){
-//                    System.out.println("AT CHILD LOOP HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-//                    System.out.println("BAAP KA HASH : " + frb.hashCode());
-//                    int prev_score =  frb.score;
-//                    FruitBoard new_frb = (FruitBoard)frb.clone(frb.fruit_board,frb.nextChance());
-////                        System.out.println( "CALLLL TO PICK with" +i+j);
-////                    frb = pick_and_update_number(frb, frb.fruit_board[i][j], i, j, false,new int[dimension][dimension],0);
-//                    new_frb = pick_and_update_number(new_frb, new_frb.fruit_board[i][j], i, j, true,new int[dimension][dimension],0);
-//                    new_frb = apply_gravity(new_frb,new_frb.updated_columns);
-//                    System.out.println("----CHILD------ MOVE : " + i + ", " + j + " HASH :" + new_frb.hashCode());
-//                    print_sol(new_frb);
-////                        new_frb.score = 0;
-////                        new_frb.fruits_picked = 0;
-////                    System.out.println("FRUITS PICKING UP: " + frb.fruits_picked + "FOR CHANCE : " + frb.chance + " Depth :" + depth);
-////                    if(frb.chance  == 0){
-////                        new_frb.score = prev_score - new_frb.score;
-////                    }
-////                    else{
-////                        new_frb.score = prev_score + new_frb.score;
-////                    }
-//                    frb.fruits_picked = 0;
-//                    new_frb.fruits_picked=0;
-//                    new_frb.move_col = j;
-//                    new_frb.move_row = i;
-//                    FruitBoard return_board = playAlphaBeta(new_frb, depth - 1, alpha, beta );
-//                    System.out.println("RETURN ==  NEW FRB +================== : " + (return_board.hashCode() == new_frb.hashCode()));
-////                    System.out.println("Depth : "+ depth + " CHANCE : " + frb.chance + " NEXT CHANCE : " + frb.nextChance());
-//                    if(frb.chance  == 0){
-//                        new_frb.score =  return_board.score + new_frb.score;
-//                    }
-//                    else{
-//                        new_frb.score =  return_board.score - new_frb.score;
-//                    }
-//                    System.out.println("RETURN SCORES : "  + return_board.score + " For Hash : " + frb.hashCode() );
-//                    print_sol(return_board);
-//                    boolean alpha_cut = false, beta_cut = false;
-//
-//                    if(frb.chance  == 0 && new_frb.score > MAX_SCORE){
-////                        System.out.println("FRUITS MAXIMUM: " + return_board.fruits_picked);
-//                        MAX_SCORE = new_frb.score;
-//                        if (MAX_SCORE >= beta){
-//                            beta_cut = true;
-//                        }
-//                        System.out.println("AT MAX_UPDATE HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-////                        System.out.println("### UPDATE SCORES MAX: "  + return_board.score +" Old Score: " + bestBoard.score+ " With Move : " + return_board.move_row + return_board.move_col);
-//                        alpha = Math.max(alpha, MAX_SCORE);
-//                        bestBoard = new_frb;
-//                    }
-//                    if(frb.chance  == 1 && new_frb.score < MIN_SCORE){
-////                        System.out.println("FRUITS MIN: " + return_board.fruits_picked);
-//                        MIN_SCORE = new_frb.score;
-//                        if (MIN_SCORE <= alpha){
-//                            alpha_cut = true;
-//                        }
-//                        System.out.println("AT MIN_UPDATE HASH CODE : " + frb.hashCode()  + "MAX : " + MAX_SCORE + "MIN : " + MIN_SCORE);
-////                        System.out.println("### UPDATE SCORES MIN: "  + return_board.score);
-//                        beta = Math.min(beta, MIN_SCORE);
-//                        bestBoard = new_frb;
-//                    }
-//                    System.out.println("//----CHILD------// "+" HASH :" + new_frb.hashCode());
-////                    if (beta_cut || alpha_cut) {
-////                        System.out.println("PRUNEDDDD");
-////                        bestBoard.fruits_picked = 0;
-////                        bestBoard = pick_and_update_number(bestBoard, bestBoard.fruit_board[bestBoard.move_row][bestBoard.move_col], bestBoard.move_row, bestBoard.move_col, true,new int[dimension][dimension],0);
-////                        bestBoard = apply_gravity(bestBoard,bestBoard.updated_columns);
-////                        return bestBoard;
-////                    }
-//                }
-//            }
-//        }
-//        System.out.println("----RETURN NORMAL : ------");
-////        bestBoard.fruits_picked = 0;
-////        bestBoard = pick_and_update_number(bestBoard, bestBoard.fruit_board[bestBoard.move_row][bestBoard.move_col], bestBoard.move_row, bestBoard.move_col, true,new int[dimension][dimension],0);
-////        bestBoard = apply_gravity(bestBoard,bestBoard.updated_columns);
-//        print_sol(bestBoard);
-//        System.out.println("/////RETURN NORMAL : /////");
-//        return bestBoard;
-//    }
 }
