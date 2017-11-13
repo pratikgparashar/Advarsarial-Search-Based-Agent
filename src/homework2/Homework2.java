@@ -2,25 +2,14 @@
 package homework2;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
-//import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.*;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.stream.Stream;
 import  java.util.*;
 
 
@@ -100,6 +89,8 @@ public class Homework2 {
     static boolean depth_updated = false;
     static int available_child = 0;
     static int final_depth = -1;
+    static int before_score  = 0;
+    static int after_score  = 0;
     
     public static void main(String[] args) throws FileNotFoundException, IOException, CloneNotSupportedException, URISyntaxException {
         // TODO code application logic here
@@ -128,6 +119,7 @@ public class Homework2 {
                 if(o[j].equals("*")){
                     r[j]=-1;
                     initial_board.total_picked++;
+                    before_score++;
                 }
                 else{
                     r[j] = Integer.parseInt(o[j]);
@@ -150,13 +142,17 @@ public class Homework2 {
             initial_board.fruit_board[i] = r;
         }
         System.out.println("CHILDS : " + available_child);
-        print_sol(initial_board);
+//        print_sol(initial_board);
         int[] p = new int[]{1};
         FruitBoard frb_new = (FruitBoard)initial_board.clone(initial_board.fruit_board,0);
         FruitBoard frb_new2 = (FruitBoard)initial_board.clone(initial_board.fruit_board,0);
-        int depth = findDynamicDepth(available_child,remaining_time);
+        int depth = 2 ;
+        if(remaining_time > 10){
+            depth = findDynamicDepth(available_child,remaining_time);
+            
+        }
         System.out.println("ORIGINAL BOARD : ");
-        print_sol(initial_board);
+//        print_sol(initial_board);
 //        frb_new = playMiniMax(frb_new, 1);
         System.out.println("DEPTH :" + depth);
         frb_new = playAlphaBeta(frb_new, depth, -999999999, 999999999);
@@ -166,6 +162,8 @@ public class Homework2 {
         System.out.println("PRUNE : " + pruneCount);
         System.out.println("CHILD : " + childCount);
         print_sol(frb_new);
+        System.out.println("Score :: " + (after_score - before_score) );
+        System.out.println("Score :: " + (after_score - before_score) * (after_score - before_score) );
         
     }
     
@@ -192,10 +190,11 @@ public class Homework2 {
 //                    file_write.print(" "+col + " ");
 //            }
             for(int col : row){
-                if(col == -1)
+                if(col == -1){
+                    after_score++;
                     file_write.print("*" + "");
-                else
-                    file_write.print(""+col + "");
+                }else{
+                    file_write.print(""+col + "");}
             }
             file_write.println("");
         }
@@ -319,7 +318,7 @@ public class Homework2 {
         }
         if(call_dynamic_depth){
             final_depth = findDynamicDepth(available_child,remaining_time);
-            depth = final_depth; 
+            if(depth != final_depth) depth = final_depth; 
         }
         Collections.sort(child_list, (FruitBoard p1, FruitBoard p2) -> p2.score - p1.score);
         FruitBoard bestBoard = (FruitBoard)frb.clone(frb.fruit_board, frb.nextChance());
@@ -358,23 +357,23 @@ public class Homework2 {
     
     static int findDynamicDepth(int available_moves,double remaining_time) throws FileNotFoundException, IOException{
         if(available_moves == 1) return 1;
-
-        double perNodeTime = remaining_time / (available_moves/2);
-            
-        System.out.println("remaining:" + remaining_time);
-        System.out.println("available :" + available_moves);
-        System.out.println("perNode:" + perNodeTime);
         BufferedReader br =  new BufferedReader(new FileReader("caliberate.txt"));
         double timePerNodeCalculated =  Double.parseDouble(br.readLine());
+        double reducing_factor = 1.0;
+        double allowedMaxPerMoveTime = remaining_time / (available_moves);
+        double possibleMoves = Math.log((allowedMaxPerMoveTime * (available_moves - reducing_factor)/ timePerNodeCalculated) + 1);
+        double maximum_depth = Math.log(available_moves - reducing_factor) ;
+        double depth = (possibleMoves/maximum_depth) - reducing_factor;
         System.out.println("perNodeCalc:" + timePerNodeCalculated);
-        double depth = ((Math.log(((perNodeTime / timePerNodeCalculated) * (available_moves - 1)) + 1)/ Math.log(available_moves)) - 1); 
-//        double depth = ((Math.log(((perNodeTime / timePerNodeCalculated) * (available_moves- 1)))/ Math.log(available_moves - 1))); 
+        System.out.println("remaining:" + remaining_time);
+        System.out.println("available :" + available_moves);
+        System.out.println("perNode:" + allowedMaxPerMoveTime);
         System.out.println("DEPTH FLOAT : " + depth);
+        System.out.println("DEPTH final : " + (int)depth);
         if(depth < 0)
             return 1;
         if(depth >= available_moves)
             return available_moves;
-//        depth = 3;
         return (int)depth;
     }
 }
